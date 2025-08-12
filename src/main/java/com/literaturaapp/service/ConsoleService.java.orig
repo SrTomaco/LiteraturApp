@@ -1,0 +1,178 @@
+package com.literaturaapp.service;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
+import com.literaturaapp.model.Author;
+import com.literaturaapp.model.Book;
+import com.literaturaapp.model.GutendexResponse;
+
+@Service
+public class ConsoleService {
+
+    private final GutendexService gutendexService;
+    private final Scanner scanner = new Scanner(System.in);
+
+    public ConsoleService(GutendexService gutendexService) {
+        this.gutendexService = gutendexService;
+    }
+
+    public void runConsole() {
+        boolean running = true;
+        while (running) {
+            printMenu();
+            String input = scanner.nextLine().trim();
+            switch (input) {
+                case "1": searchBookByTitle(); break;
+                case "2": listAllBooks(); break;
+                case "3": listAllAuthors(); break;
+                case "4": listAuthorsAliveInYear(); break;
+                case "5": listBooksByLanguage(); break;
+                case "6": top10MostDownloaded(); break;
+                case "7": searchAuthorByName(); break;
+                case "8": showStatistics(); break;
+                case "9": showBookFormatsById(); break;
+                case "10": running = false; System.out.println("Saliendo. ¡Hasta luego!"); break;
+                default: System.out.println("Opción inválida. Probá otra vez."); break;
+            }
+        }
+    }
+
+    private void printMenu() {
+        System.out.println("+------------------------------------------------+");
+        System.out.println("|              APLICACIÓN LITERATURA             |");
+        System.out.println("+------------------------------------------------+");
+        System.out.println("| 1) Buscar libro por título                     |");
+        System.out.println("| 2) Listar todos los libros registrados         |");
+        System.out.println("| 3) Listar todos los autores registrados        |");
+        System.out.println("| 4) Listar autores vivos en un año dado         |");
+        System.out.println("| 5) Listar libros por idioma                    |");
+        System.out.println("| 6) Top 10 libros más descargados               |");
+        System.out.println("| 7) Buscar autor por nombre                     |");
+        System.out.println("| 8) Mostrar estadísticas generales              |");
+        System.out.println("| 9) Ver formatos de un libro por ID             |");
+        System.out.println("| 10) Salir                                      |");
+        System.out.println("+------------------------------------------------+");
+        System.out.print("Elegí una opción: ");
+    }
+
+    private void searchBookByTitle() {
+        System.out.print("Ingresá el título o parte del título: ");
+        String q = scanner.nextLine().trim();
+        if (q.isEmpty()) { System.out.println("Consulta vacía."); return; }
+        GutendexResponse resp = gutendexService.searchBooks(q, 20);
+        if (resp==null || resp.getResults()==null || resp.getResults().isEmpty()) {
+            System.out.println("No se encontraron libros para: " + q);
+            return;
+        }
+        resp.getResults().forEach(b -> System.out.println(b));
+    }
+
+    private void listAllBooks() {
+        System.out.println("Listando libros (primera página)...");
+        GutendexResponse resp = gutendexService.listBooks(20);
+        if (resp==null || resp.getResults()==null || resp.getResults().isEmpty()) {
+            System.out.println("No hay libros disponibles.");
+            return;
+        }
+        resp.getResults().forEach(b -> System.out.println(b));
+    }
+
+    private void listAllAuthors() {
+        System.out.println("Listando autores (únicos) de la primera página de resultados...");
+        GutendexResponse resp = gutendexService.listBooks(50);
+        if (resp==null || resp.getResults()==null) { System.out.println("No hay datos."); return; }
+        Set<String> names = new TreeSet<>();
+        for (Book b : resp.getResults()) {
+            if (b.getAuthors()!=null) {
+                for (Author a : b.getAuthors()) {
+                    names.add(a.getName());
+                }
+            }
+        }
+        names.forEach(n -> System.out.println("- " + n));
+    }
+
+    private void listAuthorsAliveInYear() {
+        System.out.print("Ingresá el año (ej. 1900): ");
+        String s = scanner.nextLine().trim();
+        int year;
+        try { year = Integer.parseInt(s); } catch (Exception e) { System.out.println("Año inválido."); return; }
+        GutendexResponse resp = gutendexService.listBooks(100);
+        if (resp==null || resp.getResults()==null) { System.out.println("No hay datos."); return; }
+        Set<String> alive = new TreeSet<>();
+        for (Book b : resp.getResults()) {
+            if (b.getAuthors()!=null) {
+                for (Author a : b.getAuthors()) {
+                    Integer birth = a.getBirth_year();
+                    Integer death = a.getDeath_year();
+                    boolean aliveFlag = (birth==null || birth <= year) && (death==null || death>year);
+                    if (aliveFlag) alive.add(a.getName() + (birth!=null?" ("+birth+")":""));
+                }
+            }
+        }
+        if (alive.isEmpty()) { System.out.println("No se encontraron autores vivos en " + year); return; }
+        alive.forEach(n -> System.out.println("- " + n));
+    }
+
+    private void listBooksByLanguage() {
+        System.out.print("Ingresá el código de idioma (ej. en, es): ");
+        String lang = scanner.nextLine().trim();
+        if (lang.isEmpty()) { System.out.println("Lenguaje vacío."); return; }
+        GutendexResponse resp = gutendexService.listBooks(200);
+        if (resp==null || resp.getResults()==null) { System.out.println("No hay datos."); return; }
+        List<Book> filtered = resp.getResults().stream()
+                .filter(b -> b.getLanguages()!=null && b.getLanguages().stream().anyMatch(l -> l.equalsIgnoreCase(lang)))
+                .collect(Collectors.toList());
+        if (filtered.isEmpty()) { System.out.println("No se encontraron libros para idioma: " + lang); return; }
+        filtered.forEach(b -> System.out.println(b));
+    }
+
+    private void top10MostDownloaded() {
+        System.out.println("Calculando top 10 (agregando primeras 3 páginas)... Esto puede tardar unos segundos.");
+        List<Book> all = gutendexService.aggregateTopDownloaded(3);
+        if (all.isEmpty()) { System.out.println("No se obtuvieron datos."); return; }
+        all.stream().limit(10).forEach(b -> System.out.println(b));
+    }
+
+    private void searchAuthorByName() {
+        System.out.print("Ingresá el nombre del autor: ");
+        String q = scanner.nextLine().trim();
+        if (q.isEmpty()) { System.out.println("Consulta vacía."); return; }
+        GutendexResponse resp = gutendexService.searchBooks(q, 50);
+        if (resp==null || resp.getResults()==null || resp.getResults().isEmpty()) { System.out.println("No se encontró el autor o no hay libros."); return; }
+        Set<String> authors = new TreeSet<>();
+        for (Book b : resp.getResults()) {
+            if (b.getAuthors()!=null) {
+                for (Author a : b.getAuthors()) {
+                    if (a.getName()!=null && a.getName().toLowerCase().contains(q.toLowerCase())) {
+                        authors.add(a.toString());
+                    }
+                }
+            }
+        }
+        if (authors.isEmpty()) { System.out.println("No se encontró el autor."); return; }
+        authors.forEach(a -> System.out.println("- " + a));
+    }
+
+    private void showStatistics() {
+        System.out.println("Recolectando estadísticas de la primera página...");
+        GutendexResponse resp = gutendexService.listBooks(100);
+        if (resp==null || resp.getResults()==null || resp.getResults().isEmpty()) { System.out.println("No hay datos."); return; }
+        IntSummaryStatistics stats = resp.getResults().stream().mapToInt(Book::getDownload_count).summaryStatistics();
+        System.out.println("Total libros en respuesta: " + resp.getResults().size());
+        System.out.println("Descargas - min: " + stats.getMin() + " | max: " + stats.getMax() + " | avg: " + stats.getAverage());
+    }
+
+    private void showBookFormatsById() {
+        System.out.print("Ingresá el ID del libro para ver formatos: ");
+        String s = scanner.nextLine().trim();
+        int id;
+        try { id = Integer.parseInt(s); } catch (Exception e) { System.out.println("ID inválido."); return; }
+        Book b = gutendexService.getBookById(id);
+        if (b==null) { System.out.println("No se encontró el libro con ID " + id); return; }
+        System.out.println(b);
+    }
+}

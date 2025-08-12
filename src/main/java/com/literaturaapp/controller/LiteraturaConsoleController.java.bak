@@ -1,0 +1,186 @@
+package com.literaturaapp.controller;
+
+import com.literaturaapp.service.ServicioLiteratura;
+import com.literaturaapp.model.Book;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.DoubleSummaryStatistics;
+import java.util.Scanner;
+
+@Component
+public class LiteraturaConsoleController implements CommandLineRunner {
+
+    private final ServicioLiteratura servicio;
+    private final Scanner scanner = new Scanner(System.in);
+
+    @Autowired
+    public LiteraturaConsoleController(ServicioLiteratura servicio) {
+        this.servicio = servicio;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        System.out.println("Cargando datos iniciales (puede tardar unos segundos)...");
+        servicio.fetchAllBooks(false);
+
+        int opt = -1;
+        while (opt != 0) {
+            printMenu();
+            String line = scanner.nextLine().trim();
+            if (line.isEmpty()) continue;
+            try {
+                opt = Integer.parseInt(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Opción inválida");
+                continue;
+            }
+            switch (opt) {
+                case 1:
+                    buscarLibroPorTitulo();
+                    break;
+                case 2:
+                    listarLibros();
+                    break;
+                case 3:
+                    listarAutores();
+                    break;
+                case 4:
+                    listarAutoresVivos();
+                    break;
+                case 5:
+                    listarLibrosPorIdioma();
+                    break;
+                case 6:
+                    top10Descargas();
+                    break;
+                case 7:
+                    buscarAutorPorNombre();
+                    break;
+                case 8:
+                    estadisticasGenerales();
+                    break;
+                case 0:
+                    System.out.println("Saliendo...");
+                    break;
+                default:
+                    System.out.println("Opción no reconocida");
+            }
+        }
+    }
+
+    private void buscarLibroPorTitulo() {
+        System.out.print("Ingrese texto del título a buscar: ");
+        String q = scanner.nextLine().trim();
+        List<Book> res = servicio.findBooksByTitle(q);
+        if (res.isEmpty()) {
+            System.out.println("No se encontraron libros.");
+            return;
+        }
+        res.forEach(b -> System.out.printf("%d - %s (descargas: %d)%n", b.getId(), truncate(b.getTitle(), 60), b.getDownload_count()));
+    }
+
+    private void listarLibros() {
+        List<Book> res = servicio.listBooks();
+        if (res.isEmpty()) {
+            System.out.println("No hay libros cargados.");
+            return;
+        }
+        res.forEach(b -> System.out.printf("%d - %s | autores: %s | descargas: %d%n",
+                b.getId(), truncate(b.getTitle(), 60),
+                authorsToString(b), b.getDownload_count()));
+    }
+
+    private void listarAutores() {
+        List<String> authors = servicio.listAuthors();
+        if (authors.isEmpty()) {
+            System.out.println("No hay autores.");
+            return;
+        }
+        authors.forEach(a -> System.out.println("- " + a));
+    }
+
+    private void listarAutoresVivos() {
+        System.out.print("Ingrese año: ");
+        String y = scanner.nextLine().trim();
+        try {
+            int year = Integer.parseInt(y);
+            List<String> res = servicio.authorsAliveInYear(year);
+            if (res.isEmpty()) System.out.println("No se encontraron autores vivos en ese año.");
+            else res.forEach(a -> System.out.println("- " + a));
+        } catch (NumberFormatException ex) {
+            System.out.println("Año inválido.");
+        }
+    }
+
+    private void listarLibrosPorIdioma() {
+        System.out.print("Ingrese código de idioma (ej: en, es): ");
+        String lang = scanner.nextLine().trim();
+        List<Book> res = servicio.booksByLanguage(lang);
+        if (res.isEmpty()) {
+            System.out.println("No se encontraron libros en ese idioma.");
+            return;
+        }
+        res.forEach(b -> System.out.printf("%d - %s | idiomas: %s | descargas: %d%n",
+                b.getId(), truncate(b.getTitle(), 60), b.getLanguages(), b.getDownload_count()));
+    }
+
+    private void top10Descargas() {
+        List<Book> res = servicio.topDownloaded(10);
+        if (res.isEmpty()) {
+            System.out.println("No hay datos.");
+            return;
+        }
+        int i=1;
+        for (Book b : res) {
+            System.out.printf("%d) %s — descargas: %d%n", i++, truncate(b.getTitle(), 80), b.getDownload_count());
+        }
+    }
+
+    private void buscarAutorPorNombre() {
+        System.out.print("Ingrese texto del nombre del autor: ");
+        String q = scanner.nextLine().trim();
+        List<String> res = servicio.findAuthorByName(q);
+        if (res.isEmpty()) {
+            System.out.println("No se encontraron autores.");
+            return;
+        }
+        res.forEach(a -> System.out.println("- " + a));
+    }
+
+    private void estadisticasGenerales() {
+        DoubleSummaryStatistics stats = servicio.downloadStats();
+        System.out.println("Estadísticas de descargas:");
+        System.out.printf("Count: %d, Sum: %.0f, Min: %.0f, Max: %.0f, Avg: %.2f%n",
+                stats.getCount(), stats.getSum(), stats.getMin(), stats.getMax(), stats.getAverage());
+    }
+
+    private String authorsToString(Book b) {
+        if (b.getAuthors() == null || b.getAuthors().isEmpty()) return "(sin autores)";
+        return String.join(", ", b.getAuthors().stream().map(a -> a.getName() == null ? "" : a.getName()).toArray(String[]::new));
+    }
+
+    private String truncate(String s, int w) {
+        if (s == null) return "";
+        if (s.length() <= w) return s;
+        return s.substring(0, Math.max(0, w-3)) + "...";
+    }
+
+    private void printMenu() {
+        System.out.println();
+        System.out.println("            APLICACIÓN DE LIBROS           ");
+        System.out.println("===========================================");
+        System.out.println("1 - Buscar libro por título");
+        System.out.println("2 - Listar libros registrados");
+        System.out.println("3 - Listar autores registrados");
+        System.out.println("4 - Listar autores vivos en un año");
+        System.out.println("5 - Listar libros por idioma");
+        System.out.println("6 - Top 10 libros más descargados");
+        System.out.println("7 - Buscar autor por nombre");
+        System.out.println("8 - Estadísticas generales");
+        System.out.println("0 - Salir");
+        System.out.println("===========================================");
+    }
+}
