@@ -1,16 +1,38 @@
-Proyecto - Aplicación de consola (Literatura) - Entrega final
-Generado: 2025-08-11T20:24:57.350798Z
 
-Configuración:
-- Java 17
-- Maven
-- Spring Boot 3.x
+📘 LiteraturApp 
 
-Instrucciones:
-1) Importá el proyecto en IntelliJ como Maven project.
-2) Desde la terminal del proyecto ejecutá:
-   mvn clean package -DskipTests
-   mvn spring-boot:run
+Desafio para el curso de Alura Latam & Oracle.
 
-El menú en consola dispone de 10 opciones (buscar, listar, top10, formatos por ID, etc.).
-La opción 9 ("Ver formatos de un libro por ID") consulta el endpoint /books/<built-in function id> y muestra los formatos disponibles.
+============================================
+🔧 REQUISITOS
+- Java 17 o superior instalado
+- Apache Maven instalado
+
+============================================
+🚀 COMPILACIÓN
+
+1. Abrir una terminal en la raíz del proyecto (donde está el archivo pom.xml)
+2. Ejecutar el siguiente comando:
+
+   mvn clean package
+
+3. Esto generará un archivo .jar dentro de la carpeta:
+
+   target/LiteraturApp-0.0.1-SNAPSHOT.jar
+
+============================================
+▶️ EJECUCIÓN
+
+Para ejecutar la aplicación desde consola:
+
+   java -jar target/LiteraturApp-0.0.1-SNAPSHOT.jar
+
+============================================
+📞 Soporte
+
+Si algo falla, asegurarse de tener Java 17 y Maven correctamente instalados en el sistema.
+
+============================================
+
+
+Hecho por Tomás Solá.
